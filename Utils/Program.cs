@@ -1,9 +1,13 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Reflection;
 using Utils.Dictionaries;
 using Utils.Helper;
+using Utils.Methods;
+using Utils.TLV;
 
 namespace Utils
 {
@@ -20,9 +24,15 @@ namespace Utils
 
         static void TestTagHelper()
         {
+            LinkDALRequestIPA5Object dalRequest = new LinkDALRequestIPA5Object()
+            {
+                CapturedCardData = new LinkCardResponse(),
+                CapturedEMVCardData = new DAL_EMVCardData()
+            };
+
             List<byte[]> tagList = new List<byte[]>()
             {
-                new byte[] { 0x5F, 0x20 },
+                E0Template.CardholderName,
                 new byte[] { 0x5F, 0x30 },
                 new byte[] { 0x5F, 0x40 },
                 new byte[] { 0x5F, 0x50 }
@@ -33,27 +43,27 @@ namespace Utils
                 bool matches = TagHelper.TagMapper.ContainsKey(tag);
                 if (matches)
                 {
-                    TagHelper.TagMapper.TryGetValue(tag, out string value);
-                    Console.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} MATCHES={matches} - VALUE={value}");
-                    Debug.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} MATCHES={matches} - VALUE={value}");
+                    (string tcParameter, string dalObject, string property) tagMapperValue = (string.Empty, string.Empty, string.Empty);
+                    if(TagHelper.TagMapper.TryGetValue(tag, out tagMapperValue))
+                    {
+                        Console.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} => '{tagMapperValue.tcParameter}'");
+                        Debug.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} => '{tagMapperValue.tcParameter}'");
+
+                        //Read System.ComponentModel Description Attribute from method 'MyMethodName' in class 'MyClass'
+                        //var attribute = typeof(LinkCardResponse).GetAttribute(tagMapperValue.attribute, (DescriptionAttribute d) => d.Description);
+                        //if (attribute != null)
+                        //{
+
+                        //}
+                        Type mappedType = Type.GetType(tagMapperValue.dalObject);
+                        PropertyInfo property = mappedType.GetProperty(tagMapperValue.property);
+                        if (property != null)
+                        {
+                            dalRequest.CapturedCardData.CardholderName = "";
+                        }
+                    }
                 }
             }
-
-            //StructuralEqualityComparer<byte[]> comparer = new StructuralEqualityComparer<byte[]>();
-
-            //foreach (var mapper in TagHelper.TagMapper)
-            //{
-            //    foreach (var tag in tagList)
-            //    {
-            //        bool matches = comparer.Equals(mapper.Key, tag);
-            //        if (matches)
-            //        {
-            //            Console.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} MATCHES={matches} - VALUE={mapper.Value}");
-            //            Debug.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} MATCHES={matches} - VALUE={mapper.Value}");
-            //            break;
-            //        }
-            //    }
-            //}
         }
 
         static void TestArrayCodedString()
