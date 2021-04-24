@@ -31,3 +31,4 @@ This an application to test diverse functionality.
 ### HISTORY ###
 
 * 20210324 - Initial repository
+* 20210423 - Added Cancellation Token

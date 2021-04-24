@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 using Utils.Dictionaries;
 using Utils.Helper;
 using Utils.Methods;
@@ -16,12 +18,78 @@ namespace Utils
         //static readonly string DecryptedString = @"%B4815881002867896^DOE/DUMB JOHN         ^37829821000123456789?";
         static readonly string DecryptedString = @"%B4815881002861896^DOE/L JOHN            ^2212102356858      00998000000?";
         static readonly string DecryptedArray = "8AD3D8F024F60AC33935333139323335313030343D323530323130313130303831323334353030303F35800000000000";
-        static void Main(string[] args)
+
+        //static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             //TestArrayCodedString();
-            TestTagHelper();
+            //TestTagHelper();
+            await CancellationTokenTask(1000);
         }
 
+        static async Task CancellationTokenTask(int ttl)
+        {
+            CancellationTokenSource shortLivedTokenSource = new CancellationTokenSource(ttl);
+            CancellationToken shortLivedToken = shortLivedTokenSource.Token;
+
+            Debug.WriteLine($"START OPERATION WITH TTL={ttl}");
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
+            try
+            {
+                //await Task.Delay(ttl * 5, shortLivedToken);
+                //for (int index = 0; index < ttl * 5; index += ttl)
+                //{
+                //    await Task.Delay(ttl);
+                //    shortLivedToken.ThrowIfCancellationRequested();
+                //}
+
+                // Setup a task to check for cancellation request
+                await Task.Run(() => CheckForCancellationRequest(shortLivedToken));
+                
+                // Perform long operation
+                await Task.Delay(ttl * 5);
+
+                Debug.WriteLine("OPERATION COMPLETED WITHOUT CANCELLING!");
+            }
+            catch (OperationCanceledException ex)
+            {
+                Debug.WriteLine($"TOKEN HAS TIMED OUT WITH MESSAGE='{ex.Message}'");
+            }
+            catch (Exception e)
+            {
+                Debug.WriteLine($"EXCEPTION THROWN={e.Message}");
+            }
+            finally
+            {
+                Debug.WriteLine("EXITING OPERATION...");
+                sw.Stop();
+                Debug.WriteLine($"RUNTIME: {sw.Elapsed.TotalMilliseconds} ms");
+            }
+        }
+
+        static void CheckForCancellationRequest(CancellationToken shortLivedToken)
+        {
+            //int index = 1;
+            for (; ;)
+            {
+                try 
+                {
+                    //Debug.WriteLine($"OPERATION SENTINEL - PASS={index++}");
+                    shortLivedToken.ThrowIfCancellationRequested(); 
+                    Thread.Sleep(10);
+                    //  Task.Delay(10) won't work here since an exception is thrown on top of the expected OperationCanceledException
+                }
+                catch (OperationCanceledException)
+                {
+                    throw new Exception("OperationCanceledException");
+                }
+            }
+        }
+
+        #region --- DIVERSE UTILITIES ---
         static void TestTagHelper()
         {
             LinkDALRequestIPA5Object dalRequest = new LinkDALRequestIPA5Object()
@@ -151,5 +219,6 @@ namespace Utils
             public int OrdinalID { get; set; }
             public List<string> EventData { get; set; }
         }
+        #endregion --- DIVERSE UTILITIES ---
     }
 }
