@@ -1,15 +1,17 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Utils.ArrayProcessing;
 using Utils.Dictionaries;
 using Utils.Helper;
 using Utils.Methods;
 using Utils.TLV;
+using static Utils.Messages.Messages;
 
 namespace Utils
 {
@@ -19,12 +21,115 @@ namespace Utils
         static readonly string DecryptedString = @"%B4815881002861896^DOE/L JOHN            ^2212102356858      00998000000?";
         static readonly string DecryptedArray = "8AD3D8F024F60AC33935333139323335313030343D323530323130313130303831323334353030303F35800000000000";
 
+        const int KeyValueLength = 29;
+        const char KeyValuePaddingCharacter = '_';
+
+        static readonly string KeySlotNumber = "00";
+        static readonly string SRedCardKSN = "F987654321";
+
+        static Stopwatch stopWatch = new Stopwatch();
+
         //static void Main(string[] args)
         static async Task Main(string[] args)
         {
             //TestArrayCodedString();
             //TestTagHelper();
-            await CancellationTokenTask(1000);
+            //await CancellationTokenTask(1000);
+            //TestStringSplit();
+            //TestBoolString();
+            //SetDeviceDateTimeStamp(true);
+            //SetDeviceDateTimeStamp(false);
+
+            // byte array comparison tests
+            //ArrayConversions.PerformComparisonTests();
+
+            //Debug.WriteLine(FormatStringAsRequired(GetConcat("Ajay", "Bijay", "Sanjay")));
+
+            //($"{FormatStringAsRequired($"DEVICE: ADE-{ConfigProd.securityConfigurationObject.KeySlotNumber ?? " ?? "} KEY KSN ")}: {ConfigProd.securityConfigurationObject.SRedCardKSN ?? "[ *** NOT FOUND *** ]"}");
+            Debug.WriteLine(AssembleString(true, "??", ConsoleMessages.DeviceADEKey.GetStringValue(), KeySlotNumber, " KEY KSN ") + AssembleString(false, "[ *** NOT FOUND *** ]", " : ", SRedCardKSN));
+            Debug.WriteLine(AssembleString(true, "??", ConsoleMessages.DeviceADEKey.GetStringValue(), null, " KEY KSN ") + AssembleString(false, "[ *** NOT FOUND *** ]", " : ", null));
+
+            //Console.WriteLine(FormatStringAsRequired(AssembleString(ConsoleMessages.DeviceADEKey.GetStringValue(), KeySlotNumber, " KEY KSN ")));
+            //Debug.WriteLine(FormatStringAsRequired(string.Format("{0}", ConsoleMessages.DeviceADEKey.GetStringValue(), KeySlotNumber)));
+
+            await Task.Delay(10);
+        }
+
+        static private void SetDeviceDateTimeStamp(bool uselocalTime)
+        {
+            DateTimeOffset dateNow = uselocalTime ? DateTimeOffset.Now : DateTimeOffset.UtcNow;
+            //string pattern = @"\d";
+            //StringBuilder sb = new StringBuilder();
+
+            //// pattern YYYYMMDDHHMMSS
+            //foreach (Match m in Regex.Matches(uselocalTime ? DateTimeOffset.UtcNow.ToLocalTime().ToString("u")  : DateTimeOffset.UtcNow.ToUniversalTime().ToString("u"), pattern))
+            //{
+            //    sb.Append(m);
+            //}
+            //// reset seconds
+            //if (sb.Length == 14)
+            //{
+            //    sb[12] = '0';
+            //    sb[13] = '0';
+            //}
+
+            //string timestamp = sb.ToString();
+            //Console.WriteLine(string.Format("{0:yyyy}", dateTime));
+            string timestamp = string.Format("{0:yyyyMMddHHmmss}", dateNow);
+
+
+            Console.WriteLine($"{timestamp}");
+        }
+        
+        static void TestBoolString()
+        {
+            string value = "0000";
+            if (!string.IsNullOrEmpty(value) && Convert.ToBoolean(Convert.ToInt32(value)))
+            {
+                Console.WriteLine("value is: TRUE}");
+            }
+            else
+            {
+                Console.WriteLine("value is: FALSE");
+            }
+        }
+
+        static void TestStringSplit()
+        {
+            //List<DeviceInformation> devices = new List<DeviceInformation>
+            //{
+            //    new DeviceInformation()
+            //    { 
+            //        VipaPackageTag = "sphere.one....blah.blah.blah"
+            //    },
+            //    new DeviceInformation()
+            //    {
+            //        VipaPackageTag ="verifone.one....blah.blah.blah"
+            //    },
+            //    new DeviceInformation()
+            //    {
+            //        VipaPackageTag = "sphere.two....blah.blah.blah"
+            //    }
+            //};
+            List<DeviceInformation> devices = new List<DeviceInformation>();
+
+            string filename = "sphere.secd...blah.blah.blah";
+            string targetSignature = filename.Split(".")[0];
+
+            //List<string> filteredDevices = devices.Where(e => e.Split(".")[0].StartsWith(filename)).ToList();
+            List<DeviceInformation> filteredDevices = devices.Where(e => e.VipaPackageTag.StartsWith(targetSignature)).ToList();
+
+            if (filteredDevices == null || filteredDevices.Count == 0)
+            {
+                Console.WriteLine($"Failed to find device with signature '{targetSignature}'");
+            }
+            else
+            {
+                foreach (DeviceInformation device in filteredDevices)
+                {
+                    Console.WriteLine($"vipa version: {device.VipaPackageTag}");
+                }
+            }
         }
 
         static async Task CancellationTokenTask(int ttl)
@@ -48,7 +153,7 @@ namespace Utils
 
                 // Setup a task to check for cancellation request
                 await Task.Run(() => CheckForCancellationRequest(shortLivedToken));
-                
+
                 // Perform long operation
                 await Task.Delay(ttl * 5);
 
@@ -73,12 +178,12 @@ namespace Utils
         static void CheckForCancellationRequest(CancellationToken shortLivedToken)
         {
             //int index = 1;
-            for (; ;)
+            for (; ; )
             {
-                try 
+                try
                 {
                     //Debug.WriteLine($"OPERATION SENTINEL - PASS={index++}");
-                    shortLivedToken.ThrowIfCancellationRequested(); 
+                    shortLivedToken.ThrowIfCancellationRequested();
                     Thread.Sleep(10);
                     //  Task.Delay(10) won't work here since an exception is thrown on top of the expected OperationCanceledException
                 }
@@ -87,6 +192,19 @@ namespace Utils
                     throw new Exception("OperationCanceledException");
                 }
             }
+        }
+
+        static void StartTimer()
+        {
+            stopWatch.Stop();
+            stopWatch.Start();
+        }
+
+        static double StopTimer()
+        {
+            stopWatch.Stop();
+            //Console.WriteLine($"RUNTIME: {stopWatch.Elapsed.TotalMilliseconds} ms");
+            return stopWatch.Elapsed.TotalMilliseconds;
         }
 
         #region --- DIVERSE UTILITIES ---
@@ -107,12 +225,12 @@ namespace Utils
             };
 
             foreach (var tag in tagList)
-            { 
+            {
                 bool matches = TagHelper.TagMapper.ContainsKey(tag);
                 if (matches)
                 {
                     (string tcParameter, string dalObject, string property) tagMapperValue = (string.Empty, string.Empty, string.Empty);
-                    if(TagHelper.TagMapper.TryGetValue(tag, out tagMapperValue))
+                    if (TagHelper.TagMapper.TryGetValue(tag, out tagMapperValue))
                     {
                         Console.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} => '{tagMapperValue.tcParameter}'");
                         Debug.WriteLine($"TAG {ConversionHelper.ByteArrayToHexString(tag)} => '{tagMapperValue.tcParameter}'");
@@ -171,6 +289,35 @@ namespace Utils
                 Debug.WriteLine($"ProcessMessage() exception: {ex.Message}");
             }
             return message;
+        }
+
+        static private string FormatStringAsRequired(string input, int length = KeyValueLength, char filler = KeyValuePaddingCharacter)
+        {
+            return input.PadRight(length, filler);
+        }
+
+        static public string AssembleString(bool format, string valueMissing, params string[] items)
+        {
+            string result = "";
+            foreach (string item in items)
+            {
+                result += $"{item ?? valueMissing}";
+            }
+            return format ? FormatStringAsRequired(result) : result;
+        }
+
+        static public string GetConcat(params string[] names)
+        {
+            string result = "";
+            if (names.Length > 0)
+            {
+                result = names[0];
+            }
+            for (int i = 1; i < names.Length; i++)
+            {
+                result += ", " + names[i];
+            }
+            return result;
         }
 
         public class RootObject
